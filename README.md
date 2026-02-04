@@ -1,4 +1,4 @@
-**# RWA Tranche Protocol (Web3 Structured Finance)
+# RWA Tranche Protocol (Web3 Structured Finance)
 
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-blue)
