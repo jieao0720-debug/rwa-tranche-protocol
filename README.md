@@ -22,14 +22,13 @@ This project serves as a Proof of Concept (PoC) for bridging traditional financi
 
 The protocol splits the underlying asset pool into two tranches with distinct risk-return profiles:
 
-```mermaid
-graph TD
+```graph TD
     A[Underlying Asset Yield] --> B{Waterfall Distributor}
     B -- Priority Payment --> C[Senior Tranche]
     B -- Residual Payment --> D[Junior Tranche]
     
-    C -.-> E[Fixed APY (5%)]
-    C -.-> F[Low Risk / First Claim]
+    C -.-> E["Fixed APY (5%)"]
+    C -.-> F["Low Risk / First Claim"]
     
-    D -.-> G[Excess Returns (Float)]
-    D -.-> H[High Risk / First Loss]**
+    D -.-> G["Excess Returns (Float)"]
+    D -.-> H["High Risk / First Loss"]
