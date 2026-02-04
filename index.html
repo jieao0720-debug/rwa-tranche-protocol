@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RWA Tranche Protocol</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        /* 简单的黑色科技感 CSS */
+        body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 600px; width: 100%; }
+        h1 { color: #58a6ff; text-align: center; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        button { width: 100%; padding: 10px; margin-top: 5px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background-color: #238636; color: white; }
+        .btn-primary:hover { background-color: #2ea043; }
+        .btn-danger { background-color: #da3633; color: white; }
+        .btn-danger:hover { background-color: #f85149; }
+        .btn-outline { background: transparent; border: 1px solid #30363d; color: #58a6ff; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; background: #0d1117; border: 1px solid #30363d; color: white; border-radius: 6px; box-sizing: border-box;}
+        .label { font-size: 0.9em; color: #8b949e; }
+        .value { font-size: 1.2em; font-weight: bold; color: #fff; }
+        #status { text-align: center; margin-top: 10px; color: #f0883e; height: 20px;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>RWA Tranche Protocol</h1>
+        <button id="connectBtn" class="btn-outline">🔌 连接钱包 (Connect Wallet)</button>
+        <div id="status"></div>
+
+        <div class="card">
+            <div class="row">
+                <div>
+                    <div class="label">优先层 (Senior) TVL</div>
+                    <div class="value" id="seniorTvl">0.0</div>
+                </div>
+                <div>
+                    <div class="label">固定收益率 (APY)</div>
+                    <div class="value" style="color: #238636;">5%</div>
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <div class="label">劣后层 (Junior) TVL</div>
+                    <div class="value" id="juniorTvl">0.0</div>
+                </div>
+                <div>
+                    <div class="label">当前杠杆率</div>
+                    <div class="value" style="color: #da3633;">浮动 (Float)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🏦 存款 (Deposit)</h3>
+            <input type="number" id="depositAmount" placeholder="输入 USDT 金额">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-primary" onclick="deposit(0)">存入 Senior (稳健)</button>
+                <button class="btn-danger" onclick="deposit(1)">存入 Junior (激进)</button>
+            </div>
+            <p style="font-size: 12px; color: #8b949e; text-align: center;">首次存款需先在钱包确认授权</p>
+        </div>
+
+        <div class="card">
+            <h3>💰 提款 (Withdraw)</h3>
+            <div class="row">
+                <span class="label">如果你已存入资金且本轮已结算，可点击下方提款。</span>
+            </div>
+            <button class="btn-outline" onclick="withdraw()">提取本金 + 收益</button>
+        </div>
+
+        <div class="card" style="border-color: #da3633;">
+            <h3 style="color: #da3633;">⚡ 管理员控制台 (Admin)</h3>
+            <button class="btn-danger" onclick="closeRound()">🚨 结算并分红 (Close Round)</button>
+        </div>
+    </div>
+
+    <script>
+        // ================= 配置区域 (TODO: 请替换这里) =================
+        const USDT_ADDRESS = "0x3eC21aa2b56E843b3641C74e8D12d66Bd0C919ff"; 
+        const VAULT_ADDRESS = "0xbd6B25948eB056074A60C3A79ae467E3C0053c2d";
+
+        // 请把 Remix 里的 ABI 完整复制到下面的中括号 [] 里
+        const USDT_ABI = [ 
+            "function approve(address spender, uint256 value) external returns (bool)",
+            "function allowance(address owner, address spender) external view returns (uint256)"
+        ]; 
+        
+        // 为了方便你，我手动简写了 Vault 的 ABI，你不需要复制一大坨了，直接用这个！
+        // 只要你的函数名没改，这个通用的 ABI 就能用。
+        const VAULT_ABI = [
+            "function deposit(uint256 amount, uint8 trancheType) external",
+            "function withdraw() external",
+            "function closeRoundAndDistribute() external",
+            "function totalSeniorDeposit() view returns (uint256)",
+            "function totalJuniorDeposit() view returns (uint256)",
+            "function isRoundClosed() view returns (bool)"
+        ];
+        // ============================================================
+
+        let provider, signer, usdtContract, vaultContract;
+
+        async function init() {
+            if (window.ethereum) {
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                const address = await signer.getAddress();
+                document.getElementById("connectBtn").innerText = "✅ " + address.slice(0,6) + "..." + address.slice(-4);
+                
+                // 初始化合约
+                usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+                vaultContract = new ethers.Contract(VAULT_ADDRESS, VAULT_ABI, signer);
+
+                refreshData();
+            } else {
+                alert("请安装 MetaMask!");
+            }
+        }
+
+        async function refreshData() {
+            try {
+                // 读取链上数据
+                const sTvl = await vaultContract.totalSeniorDeposit();
+                const jTvl = await vaultContract.totalJuniorDeposit();
+                
+                // 格式化显示 (除以 10^18)
+                document.getElementById("seniorTvl").innerText = ethers.formatUnits(sTvl, 18) + " USDT";
+                document.getElementById("juniorTvl").innerText = ethers.formatUnits(jTvl, 18) + " USDT";
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function deposit(type) {
+            const amountStr = document.getElementById("depositAmount").value;
+            if(!amountStr) return alert("请输入金额");
+            const amount = ethers.parseUnits(amountStr, 18); // 转换为 Wei
+
+            setStatus("正在检查授权...");
+            
+            try {
+                // 1. 检查授权 (Approve)
+                // 简单起见，我们直接尝试 Approve，不管是不是已经授权过（多做一次无害）
+                const txApprove = await usdtContract.approve(VAULT_ADDRESS, amount);
+                setStatus("等待授权上链...");
+                await txApprove.wait();
+
+                // 2. 存款 (Deposit)
+                setStatus("授权完成，正在存入...");
+                const txDeposit = await vaultContract.deposit(amount, type);
+                setStatus("等待存款确认...");
+                await txDeposit.wait();
+
+                setStatus("✅ 存款成功！");
+                refreshData();
+            } catch (err) {
+                console.error(err);
+                setStatus("❌ 交易失败: " + err.message);
+            }
+        }
+
+        async function withdraw() {
+            try {
+                setStatus("正在提款...");
+                const tx = await vaultContract.withdraw();
+                await tx.wait();
+                setStatus("✅ 提款成功，资金已回到钱包");
+            } catch (err) {
+                setStatus("❌ " + err.message);
+            }
+        }
+
+        async function closeRound() {
+            try {
+                setStatus("正在执行结算...");
+                const tx = await vaultContract.closeRoundAndDistribute();
+                await tx.wait();
+                setStatus("✅ 结算完成，收益已分配");
+            } catch (err) {
+                setStatus("❌ " + err.message);
+            }
+        }
+
+        function setStatus(msg) {
+            document.getElementById("status").innerText = msg;
+        }
+
+        document.getElementById("connectBtn").onclick = init;
+    </script>
+</body>
+</html>
