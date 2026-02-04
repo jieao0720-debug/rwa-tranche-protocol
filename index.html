@@ -3,192 +3,315 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RWA Tranche Protocol</title>
+    <title>RWA Tranche Protocol (Pro)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        /* 简单的黑色科技感 CSS */
-        body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { max-width: 600px; width: 100%; }
-        h1 { color: #58a6ff; text-align: center; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-        button { width: 100%; padding: 10px; margin-top: 5px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-primary { background-color: #238636; color: white; }
-        .btn-primary:hover { background-color: #2ea043; }
-        .btn-danger { background-color: #da3633; color: white; }
-        .btn-danger:hover { background-color: #f85149; }
-        .btn-outline { background: transparent; border: 1px solid #30363d; color: #58a6ff; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; background: #0d1117; border: 1px solid #30363d; color: white; border-radius: 6px; box-sizing: border-box;}
-        .label { font-size: 0.9em; color: #8b949e; }
-        .value { font-size: 1.2em; font-weight: bold; color: #fff; }
-        #status { text-align: center; margin-top: 10px; color: #f0883e; height: 20px;}
+        /* v2.0 样式升级：更细腻的交互反馈 */
+        :root { --primary: #238636; --danger: #da3633; --bg: #0d1117; --card-bg: #161b22; --border: #30363d; --text: #c9d1d9; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; }
+        .container { max-width: 500px; width: 100%; animation: fadeIn 0.5s ease; }
+        h1 { color: #58a6ff; text-align: center; margin-bottom: 5px; font-size: 1.5rem; }
+        .subtitle { text-align: center; color: #8b949e; font-size: 0.9rem; margin-bottom: 20px; }
+        
+        /* 卡片样式 */
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.2s; }
+        .card:hover { border-color: #58a6ff; }
+        
+        /* 数据行 */
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .label { font-size: 0.85em; color: #8b949e; }
+        .value { font-size: 1.1em; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+        .highlight { color: #58a6ff; }
+        
+        /* 按钮样式 */
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.95rem; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+        .btn-connect { background: transparent; border: 1px solid var(--border); color: #58a6ff; margin-bottom: 20px; }
+        .btn-connect:hover { background: rgba(88, 166, 255, 0.1); }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background-color: #2ea043; transform: translateY(-1px); }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled) { background-color: #f85149; transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover:not(:disabled) { border-color: #8b949e; }
+
+        /* 输入框区域 */
+        .input-group { position: relative; margin-bottom: 15px; }
+        input { width: 100%; padding: 12px; padding-right: 60px; background: #010409; border: 1px solid var(--border); color: white; border-radius: 8px; box-sizing: border-box; font-size: 1rem; outline: none; transition: border 0.2s; }
+        input:focus { border-color: #58a6ff; }
+        .unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #8b949e; font-size: 0.9rem; pointer-events: none; }
+        
+        /* 余额显示 */
+        .balance-display { font-size: 0.8rem; text-align: right; color: #8b949e; margin-top: -10px; margin-bottom: 15px; cursor: pointer; }
+        .balance-display:hover { color: #58a6ff; text-decoration: underline; }
+
+        /* 状态栏 */
+        #status { min-height: 24px; text-align: center; font-size: 0.9rem; margin-top: 10px; border-radius: 6px; padding: 8px; opacity: 0; transition: opacity 0.3s; }
+        .status-show { opacity: 1 !important; }
+        .status-loading { color: #f0883e; background: rgba(240, 136, 62, 0.1); }
+        .status-success { color: #238636; background: rgba(35, 134, 54, 0.1); }
+        .status-error { color: #da3633; background: rgba(218, 54, 51, 0.1); }
+
+        /* 动画 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+        .loading .spinner { display: block; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>RWA Tranche Protocol</h1>
-        <button id="connectBtn" class="btn-outline">🔌 连接钱包 (Connect Wallet)</button>
-        <div id="status"></div>
+        <div class="subtitle">Decentralized Structured Finance on Sepolia</div>
+        
+        <button id="connectBtn" class="btn-connect" onclick="init()">
+            <span>🔌 连接钱包 (Connect Wallet)</span>
+        </button>
 
         <div class="card">
             <div class="row">
-                <div>
-                    <div class="label">优先层 (Senior) TVL</div>
-                    <div class="value" id="seniorTvl">0.0</div>
-                </div>
-                <div>
-                    <div class="label">固定收益率 (APY)</div>
-                    <div class="value" style="color: #238636;">5%</div>
-                </div>
+                <span class="label">🔵 Senior TVL (稳健层)</span>
+                <span class="value" id="seniorTvl">--</span>
             </div>
             <div class="row">
-                <div>
-                    <div class="label">劣后层 (Junior) TVL</div>
-                    <div class="value" id="juniorTvl">0.0</div>
-                </div>
-                <div>
-                    <div class="label">当前杠杆率</div>
-                    <div class="value" style="color: #da3633;">浮动 (Float)</div>
-                </div>
+                <span class="label">🔴 Junior TVL (激进层)</span>
+                <span class="value" id="juniorTvl">--</span>
+            </div>
+            <div style="height: 1px; background: var(--border); margin: 10px 0;"></div>
+            <div class="row">
+                <span class="label">我的钱包余额 (My Balance)</span>
+                <span class="value highlight" id="myUsdtBalance">--</span>
             </div>
         </div>
 
         <div class="card">
-            <h3>🏦 存款 (Deposit)</h3>
-            <input type="number" id="depositAmount" placeholder="输入 USDT 金额">
+            <div class="row">
+                <h3 style="margin:0; font-size: 1.1rem;">🏦 存款 (Deposit)</h3>
+                <span class="label">APY: <span style="color:#238636">5%</span> / Float</span>
+            </div>
+            
+            <div class="input-group">
+                <input type="number" id="depositAmount" placeholder="0.0" oninput="validateAmount()">
+                <span class="unit">USDT</span>
+            </div>
+            <div class="balance-display" onclick="fillMax()">
+                可用: <span id="clickableBalance">0.0</span> USDT (点击最大)
+            </div>
+
             <div style="display: flex; gap: 10px;">
-                <button class="btn-primary" onclick="deposit(0)">存入 Senior (稳健)</button>
-                <button class="btn-danger" onclick="deposit(1)">存入 Junior (激进)</button>
+                <button class="btn-primary" id="btnSenior" onclick="handleDeposit(0)">
+                    <div class="spinner"></div> <span>存入 Senior</span>
+                </button>
+                <button class="btn-danger" id="btnJunior" onclick="handleDeposit(1)">
+                    <div class="spinner"></div> <span>存入 Junior</span>
+                </button>
             </div>
-            <p style="font-size: 12px; color: #8b949e; text-align: center;">首次存款需先在钱包确认授权</p>
         </div>
 
         <div class="card">
-            <h3>💰 提款 (Withdraw)</h3>
             <div class="row">
-                <span class="label">如果你已存入资金且本轮已结算，可点击下方提款。</span>
+                <h3 style="margin:0; font-size: 1.1rem;">💰 赎回 (Redeem)</h3>
             </div>
-            <button class="btn-outline" onclick="withdraw()">提取本金 + 收益</button>
+            <p style="font-size: 0.85em; color: #8b949e; margin-top: 5px;">只有在管理员结算后方可赎回本金与收益。</p>
+            <button class="btn-outline" id="btnWithdraw" onclick="handleWithdraw()">
+                <div class="spinner"></div> <span>提取所有资金</span>
+            </button>
         </div>
 
-        <div class="card" style="border-color: #da3633;">
-            <h3 style="color: #da3633;">⚡ 管理员控制台 (Admin)</h3>
-            <button class="btn-danger" onclick="closeRound()">🚨 结算并分红 (Close Round)</button>
+        <div class="card" style="border-color: rgba(218, 54, 51, 0.3);">
+            <div class="row">
+                <h3 style="margin:0; font-size: 1.1rem; color: #f85149;">⚡ 管理员面板</h3>
+            </div>
+            <button class="btn-danger" id="btnClose" onclick="handleCloseRound()" style="background: rgba(218, 54, 51, 0.1); border: 1px solid var(--danger); color: var(--danger);">
+                <div class="spinner"></div> <span>🚨 结算周期 (Settlement)</span>
+            </button>
         </div>
+
+        <div id="status"></div>
     </div>
 
     <script>
-        // ================= 配置区域 (TODO: 请替换这里) =================
+        // ================= 配置区域 (请修改这里) =================
         const USDT_ADDRESS = "0x3eC21aa2b56E843b3641C74e8D12d66Bd0C919ff"; 
         const VAULT_ADDRESS = "0xbd6B25948eB056074A60C3A79ae467E3C0053c2d";
+        // ======================================================
 
-        // 请把 Remix 里的 ABI 完整复制到下面的中括号 [] 里
-        const USDT_ABI = [ 
+        const USDT_ABI = [
             "function approve(address spender, uint256 value) external returns (bool)",
-            "function allowance(address owner, address spender) external view returns (uint256)"
-        ]; 
+            "function allowance(address owner, address spender) external view returns (uint256)",
+            "function balanceOf(address account) external view returns (uint256)" // 新增：查余额
+        ];
         
-        // 为了方便你，我手动简写了 Vault 的 ABI，你不需要复制一大坨了，直接用这个！
-        // 只要你的函数名没改，这个通用的 ABI 就能用。
         const VAULT_ABI = [
             "function deposit(uint256 amount, uint8 trancheType) external",
             "function withdraw() external",
             "function closeRoundAndDistribute() external",
             "function totalSeniorDeposit() view returns (uint256)",
-            "function totalJuniorDeposit() view returns (uint256)",
-            "function isRoundClosed() view returns (bool)"
+            "function totalJuniorDeposit() view returns (uint256)"
         ];
-        // ============================================================
 
-        let provider, signer, usdtContract, vaultContract;
+        let provider, signer, usdtContract, vaultContract, userAddress;
+        let userBalanceWei = 0n; // 存储用户余额 (BigInt)
 
         async function init() {
-            if (window.ethereum) {
+            if (!window.ethereum) return alert("请安装 MetaMask!");
+            try {
                 provider = new ethers.BrowserProvider(window.ethereum);
                 signer = await provider.getSigner();
-                const address = await signer.getAddress();
-                document.getElementById("connectBtn").innerText = "✅ " + address.slice(0,6) + "..." + address.slice(-4);
+                userAddress = await signer.getAddress();
                 
-                // 初始化合约
+                // UI 更新
+                const btn = document.getElementById("connectBtn");
+                btn.innerHTML = `<span>✅ 已连接: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}</span>`;
+                btn.classList.add("btn-outline");
+                
+                // 合约初始化
                 usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
                 vaultContract = new ethers.Contract(VAULT_ADDRESS, VAULT_ABI, signer);
 
-                refreshData();
-            } else {
-                alert("请安装 MetaMask!");
+                await refreshData();
+                showStatus("✅ 钱包连接成功", "success");
+            } catch (err) {
+                console.error(err);
+                showStatus("❌ 连接失败: " + err.message, "error");
             }
         }
 
         async function refreshData() {
+            if (!usdtContract || !vaultContract) return;
             try {
-                // 读取链上数据
-                const sTvl = await vaultContract.totalSeniorDeposit();
-                const jTvl = await vaultContract.totalJuniorDeposit();
+                // 并行读取数据以加快速度
+                const [sTvl, jTvl, bal] = await Promise.all([
+                    vaultContract.totalSeniorDeposit(),
+                    vaultContract.totalJuniorDeposit(),
+                    usdtContract.balanceOf(userAddress)
+                ]);
+
+                userBalanceWei = bal; // 存下来方便计算
+
+                // 格式化
+                document.getElementById("seniorTvl").innerText = formatUSDT(sTvl) + " U";
+                document.getElementById("juniorTvl").innerText = formatUSDT(jTvl) + " U";
                 
-                // 格式化显示 (除以 10^18)
-                document.getElementById("seniorTvl").innerText = ethers.formatUnits(sTvl, 18) + " USDT";
-                document.getElementById("juniorTvl").innerText = ethers.formatUnits(jTvl, 18) + " USDT";
+                const balFormatted = formatUSDT(bal);
+                document.getElementById("myUsdtBalance").innerText = balFormatted + " U";
+                document.getElementById("clickableBalance").innerText = balFormatted;
+
             } catch (err) {
-                console.error(err);
+                console.error("刷新数据失败", err);
             }
         }
 
-        async function deposit(type) {
-            const amountStr = document.getElementById("depositAmount").value;
-            if(!amountStr) return alert("请输入金额");
-            const amount = ethers.parseUnits(amountStr, 18); // 转换为 Wei
-
-            setStatus("正在检查授权...");
+        // 智能存款逻辑 (核心升级)
+        async function handleDeposit(type) {
+            const inputVal = document.getElementById("depositAmount").value;
+            if (!inputVal || inputVal <= 0) return showStatus("❌ 请输入有效金额", "error");
             
-            try {
-                // 1. 检查授权 (Approve)
-                // 简单起见，我们直接尝试 Approve，不管是不是已经授权过（多做一次无害）
-                const txApprove = await usdtContract.approve(VAULT_ADDRESS, amount);
-                setStatus("等待授权上链...");
-                await txApprove.wait();
+            const amountWei = ethers.parseUnits(inputVal, 18);
+            
+            // 检查余额
+            if (amountWei > userBalanceWei) return showStatus("❌ 余额不足 (Insufficient Balance)", "error");
 
-                // 2. 存款 (Deposit)
-                setStatus("授权完成，正在存入...");
-                const txDeposit = await vaultContract.deposit(amount, type);
-                setStatus("等待存款确认...");
+            const btnId = type === 0 ? "btnSenior" : "btnJunior";
+            setLoading(btnId, true, "处理中...");
+
+            try {
+                // 1. 检查授权 (Smart Approve)
+                const currentAllowance = await usdtContract.allowance(userAddress, VAULT_ADDRESS);
+                
+                if (currentAllowance < amountWei) {
+                    showStatus("⏳ 正在请求授权 (Approving)...", "loading");
+                    const txApprove = await usdtContract.approve(VAULT_ADDRESS, amountWei);
+                    await txApprove.wait();
+                    showStatus("✅ 授权完成，正在存款...", "success");
+                }
+
+                // 2. 执行存款
+                showStatus("⏳ 正在存入金库...", "loading");
+                const txDeposit = await vaultContract.deposit(amountWei, type);
                 await txDeposit.wait();
 
-                setStatus("✅ 存款成功！");
-                refreshData();
+                showStatus("🎉 存款成功！(Deposit Success)", "success");
+                document.getElementById("depositAmount").value = ""; // 清空输入框
+                await refreshData(); // 刷新余额
+
             } catch (err) {
                 console.error(err);
-                setStatus("❌ 交易失败: " + err.message);
+                // 能够识别用户点了“取消”
+                if (err.message.includes("rejected")) {
+                    showStatus("❌ 用户取消了操作", "error");
+                } else {
+                    showStatus("❌ 交易失败: " + (err.reason || err.message), "error");
+                }
+            } finally {
+                setLoading(btnId, false, type === 0 ? "存入 Senior" : "存入 Junior");
             }
         }
 
-        async function withdraw() {
+        async function handleWithdraw() {
+            setLoading("btnWithdraw", true, "提款中...");
             try {
-                setStatus("正在提款...");
                 const tx = await vaultContract.withdraw();
+                showStatus("⏳ 交易确认中...", "loading");
                 await tx.wait();
-                setStatus("✅ 提款成功，资金已回到钱包");
+                showStatus("💰 提款成功！资金已到账", "success");
+                await refreshData();
             } catch (err) {
-                setStatus("❌ " + err.message);
+                showStatus("❌ " + (err.reason || "提款失败或未到结算期"), "error");
+            } finally {
+                setLoading("btnWithdraw", false, "提取所有资金");
             }
         }
 
-        async function closeRound() {
+        async function handleCloseRound() {
+            setLoading("btnClose", true, "结算中...");
             try {
-                setStatus("正在执行结算...");
                 const tx = await vaultContract.closeRoundAndDistribute();
+                showStatus("⏳ 正在链上计算分红...", "loading");
                 await tx.wait();
-                setStatus("✅ 结算完成，收益已分配");
+                showStatus("⚡ 结算完成！用户现可提款", "success");
             } catch (err) {
-                setStatus("❌ " + err.message);
+                showStatus("❌ " + (err.reason || "结算失败"), "error");
+            } finally {
+                setLoading("btnClose", false, "🚨 结算周期 (Settlement)");
             }
         }
 
-        function setStatus(msg) {
-            document.getElementById("status").innerText = msg;
+        // --- 辅助工具 ---
+        function formatUSDT(wei) {
+            return parseFloat(ethers.formatUnits(wei, 18)).toFixed(2);
         }
 
-        document.getElementById("connectBtn").onclick = init;
+        function fillMax() {
+            if (userBalanceWei > 0n) {
+                document.getElementById("depositAmount").value = ethers.formatUnits(userBalanceWei, 18);
+            }
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById("status");
+            el.innerText = msg;
+            el.className = `status-${type} status-show`;
+            // 3秒后自动消失
+            setTimeout(() => {
+                if (el.innerText === msg) el.classList.remove("status-show");
+            }, 5000);
+        }
+
+        function setLoading(btnId, isLoading, originalText) {
+            const btn = document.getElementById(btnId);
+            if (isLoading) {
+                btn.classList.add("loading");
+                btn.disabled = true;
+                // 保持 spinner，改文字
+                btn.querySelector("span").innerText = originalText; 
+            } else {
+                btn.classList.remove("loading");
+                btn.disabled = false;
+                btn.querySelector("span").innerText = originalText;
+            }
+        }
     </script>
 </body>
 </html>
